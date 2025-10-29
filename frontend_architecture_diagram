@@ -1,0 +1,63 @@
+digraph FrontendArchitecture {
+	rankdir=TB size=10
+	App [label="App.js
+(Main Entry Point)" fillcolor=lightblue shape=box style=filled]
+	TopBar [label="TopBar
+(Persistent Nav)" fillcolor=lightyellow shape=box style=filled]
+	Sidebar [label="Sidebar
+(Collapsible)" fillcolor=lightyellow shape=box style=filled]
+	MainContent [label="Main Content Area
+(Routes Render Here)" fillcolor=lightyellow shape=box style=filled]
+	App -> TopBar
+	App -> Sidebar
+	App -> MainContent
+	Router [label="React Router" fillcolor=lightpink shape=ellipse style=filled]
+	MainContent -> Router
+	Home [label="Home Page" shape=box]
+	Upload [label="Upload Page" shape=box]
+	Results [label="Results Page" shape=box]
+	Wizard [label="Analysis Wizard" fillcolor=lightgreen shape=box style=filled]
+	Router -> Home
+	Router -> Upload
+	Router -> Results
+	Router -> Wizard
+	Step1 [label="Step 1
+(Data Upload)" shape=ellipse]
+	Step2 [label="Step 2
+(Parameter Config)" shape=ellipse]
+	Step3 [label="Step 3
+(Preview/Results)" shape=ellipse]
+	Wizard -> Step1
+	Step1 -> Step2
+	Step2 -> Step3
+	subgraph cluster_structure {
+		label="Project Structure" style=dashed
+		Public [label="public/
+Static Assets, index.html" shape=folder]
+		Src [label="src/" shape=folder]
+		Components [label="components/
+TopBar, Sidebar, Reusable" shape=folder]
+		Pages [label="pages/
+Home, Upload, Results, Wizard" shape=folder]
+		WizardDir [label="wizard/
+Wizard Step Components" shape=folder]
+		AppFile [label="App.js" shape=note]
+		IndexFile [label="index.js" shape=note]
+		Src -> Components
+		Src -> Pages
+		Src -> WizardDir
+		Src -> AppFile
+		Src -> IndexFile
+		Public -> Src
+	}
+	State [label="State Management
+(useState in App.js)" fillcolor=lightgrey shape=parallelogram style=filled]
+	App -> State
+	State -> Sidebar [label=props]
+	Styling [label="Styling
+(App.css, index.css)" fillcolor=white shape=note style=filled]
+	Styling -> App
+	Ext [label="Extensible
+(New Pages / Wizard Steps)" fillcolor=lightcyan shape=diamond style=filled]
+	Router -> Ext
+}
