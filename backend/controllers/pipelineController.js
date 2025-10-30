@@ -152,6 +152,52 @@ const getAllJobs = async (req, res) => {
   }
 };
 
+const { exec } = require("child_process");
+
+// @desc    Execute a specific pipeline CLI step
+// @route   POST /api/pipelines/run-step
+const runStep = async (req, res) => {
+  try {
+    const { command, args } = req.body;
+    const user_id = req.user.id || req.user.user_id; // still available from auth
+
+    if (!command) {
+      return res.status(400).json({ error: "Missing command" });
+    }
+
+    // Build CLI command dynamically
+    let cli = command;
+    for (const [key, value] of Object.entries(args || {})) {
+      if (typeof value === "boolean") {
+        cli += value ? ` --${key}` : "";
+      } else if (value !== "" && value !== null && value !== undefined) {
+        cli += ` --${key} ${value}`;
+      }
+    }
+
+    console.log(`🚀 [User ${user_id}] Executing CLI: ${cli}`);
+
+    // Optional: record the run in the pipelines table
+    await pool.query(
+      `INSERT INTO pipelines (step_name, config, timestamp_step, job_id)
+       VALUES ($1, $2, NOW(), NULL)`,
+      [command, args]
+    );
+
+    // Execute or simulate CLI
+    exec(cli, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`❌ CLI Error: ${stderr}`);
+        return res.status(500).json({ error: stderr });
+      }
+      res.json({ output: stdout || "✅ Step completed successfully." });
+    });
+  } catch (err) {
+    console.error("runStep error:", err);
+    res.status(500).json({ error: "Failed to execute pipeline step" });
+  }
+};
+
 
 module.exports = {
   startPipeline,
@@ -159,4 +205,5 @@ module.exports = {
   createJobForFile,
   getJobs,
   getAllJobs,
+  runStep,
 };
