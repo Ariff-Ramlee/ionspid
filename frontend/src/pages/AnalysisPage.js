@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import Layout from "../components/Layout";
+import { useAuth } from "../context/AuthContext"; // adjust path if needed
+
 
 /* =========================================================
    STEP DEFINITIONS
@@ -203,6 +205,7 @@ const argMap = {
    MAIN COMPONENT
    ========================================================= */
 const AnalysisPage = () => {
+  const { token, user } = useAuth();
   const [activeStep, setActiveStep] = useState(null);
   const [params, setParams] = useState({});
   const [statusMap, setStatusMap] = useState(
@@ -220,52 +223,78 @@ const AnalysisPage = () => {
   const handleToggle = (key) =>
     setParams((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // Run CLI step and unlock next
-  const handleRunStep = async (stepId) => {
+// Run CLI step and unlock next
+const handleRunStep = async (stepId) => {
+  try {
     setMessage(`Running ${stepId}...`);
     updateStatus(stepId, "running");
 
-    try {
-      // Map custom CLI command names
-      const commandMap = {
-        qc1: "qc run",
-        qc2: "qc reads",
-        trim: "trim quality",
-        chimera: "chimera detect",
-        consensus: "polish-consensus run",
-        taxonomy: "taxonomy assign",
-        report: "blast report",
-      };
+    // 🧩 Map pipeline step → corresponding CLI command
+    const commandMap = {
+      qc1: "qc run",
+      qc2: "qc reads",
+      trim: "trim quality",
+      chimera: "chimera detect",
+      consensus: "polish-consensus run",
+      taxonomy: "taxonomy assign",
+      report: "blast report",
+    };
 
-      const token = localStorage.getItem("token");
-
-      const response = await fetch("/pipelines/run-step", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" ,
-                   "Authorization": 'Bearer ${token}',
-        },
-        body: JSON.stringify({
-          command: commandMap[stepId] || `${stepId} run`,
-          args: params,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Execution failed");
-      await response.json();
-
-      updateStatus(stepId, "completed");
-      setMessage(`✅ ${stepId} completed successfully!`);
-
-      const currentIndex = pipelineSteps.findIndex((s) => s.id === stepId);
-      const nextStep = pipelineSteps[currentIndex + 1];
-
-      if (nextStep) updateStatus(nextStep.id, "unlocked");
-      else setMessage("🎉 All pipeline steps completed successfully!");
-    } catch (err) {
-      updateStatus(stepId, "error");
-      setMessage(`❌ Error running ${stepId}: ${err.message}`);
+    // 🔑 Retrieve JWT token for authentication
+    if (!token) {
+      alert("⚠️ No token found. Please log in again.");
+      updateStatus(stepId, "failed");
+      setMessage("Authentication failed. Please log in again.");
+      return;
     }
-  };
+
+    // 🧠 Build command payload
+    const payload = {
+      command: commandMap[stepId] || `${stepId} run`,
+      args: params,
+    };
+
+    console.log(`🚀 Executing pipeline step: ${payload.command}`);
+
+    // 📡 Send authenticated request to backend
+    const response = await fetch("http://localhost:5000/api/pipelines/run-step", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`, // ✅ matches authMiddleware
+      },
+      body: JSON.stringify({
+      command: commandMap[stepId] || `${stepId} run`,
+      args: params,
+      }),
+    });
+
+    // 🧾 Parse response
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Pipeline step failed");
+    }
+
+    // ✅ Log and notify success
+    console.log(`✅ Step "${stepId}" executed successfully:`, data);
+    setMessage(`✅ ${stepId} completed successfully.`);
+    updateStatus(stepId, "completed");
+
+    // 🔓 Automatically unlock next step
+    const nextStepIndex = pipelineSteps.findIndex((s) => s.id === stepId) + 1;
+    if (nextStepIndex < pipelineSteps.length) {
+      const nextStep = pipelineSteps[nextStepIndex];
+      updateStatus(nextStep.id, "ready");
+    }
+
+  } catch (error) {
+    console.error(`❌ Error during ${stepId}:`, error);
+    setMessage(`❌ Error running ${stepId}: ${error.message}`);
+    updateStatus(stepId, "failed");
+  }
+};
+
 
   const updateStatus = (stepId, newStatus) => {
     setStatusMap((prev) => ({ ...prev, [stepId]: newStatus }));
